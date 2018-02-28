@@ -34,7 +34,7 @@ CONCURRENT_REQUESTS = 32
 # CONCURRENT_REQUESTS_PER_IP = 16
 
 # Disable cookies (enabled by default)
-# COOKIES_ENABLED = False
+COOKIES_ENABLED = True
 
 # Disable Telnet Console (enabled by default)
 # TELNETCONSOLE_ENABLED = False
@@ -67,7 +67,7 @@ CONCURRENT_REQUESTS = 32
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'ArticleSpider.pipelines.MysqlTwistedPipeline': 2,
-    'ArticleSpider.pipelines.ArticleImagePipeline': 1
+#    'ArticleSpider.pipelines.ArticleImagePipeline': 1
 }
 
 IMAGES_URLS_FIELD = "cover_url"
@@ -101,3 +101,4 @@ MYSQL_DB = "article_spider"
 MYSQL_USER = "root"
 MYSQL_PASSWORD = "12345678"
 MYSQL_CHARSET = "utf8mb4"
+

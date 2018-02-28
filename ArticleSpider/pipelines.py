@@ -49,13 +49,13 @@ class MysqlTwistedPipeline(object):
         inert_sql = '''
             INSERT INTO article_jobbole(
                 page_url_id, page_url, title, create_date, cover_url, tags, content,
-                cover_path, thumbup_num, comment_num, fav_num)
+                cover_path, thumb_up_num, comment_num, fav_num)
             VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         '''
         cursor.execute(inert_sql, (item["page_url_id"], item["page_url"]
                                    , item["title"], item["create_date"]
                                    , item["cover_url"][0], item["tags"]
-                                   , item["content"], item["cover_path"]
+                                   , item["content"], item.get("cover_path", "")
                                    , item.get("thumb_up_num", 0), item["comment_num"], item["fav_num"]))
 
 

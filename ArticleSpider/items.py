@@ -6,8 +6,12 @@ import datetime
 import re
 
 
-class ArticleItemLoader(ItemLoader):
+class JobBoleItemLoader(ItemLoader):
     # 默认ItemLoader只保留css选择器解析后的第一个元素
+    default_output_processor = TakeFirst()
+
+
+class ZhiHuQuestionItemLoader(ItemLoader):
     default_output_processor = TakeFirst()
 
 
@@ -68,3 +72,22 @@ class JobBoleArticleItem(scrapy.Item):
     fav_num = scrapy.Field(
         input_processor=MapCompose(get_num)
     )                               # 收藏数
+
+
+class ZhiHuQuestionItem(scrapy.Item):
+    question_id = scrapy.Field()
+    title = scrapy.Field()
+    content = scrapy.Field()
+    topics = scrapy.Field(
+        output_processor=Join(",")
+    )
+    answers_num = scrapy.Field(
+        input_processor=MapCompose(get_num)
+    )
+    create_time = scrapy.Field()
+    update_time = scrapy.Field()
+    comment_num = scrapy.Field(
+        input_processor=MapCompose(get_num)
+    )
+    watch_num = scrapy.Field()
+    click_num = scrapy.Field()

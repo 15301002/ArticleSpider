@@ -4,7 +4,7 @@ from scrapy.http import Request
 from urllib import parse
 from ArticleSpider.items import JobBoleArticleItem
 from ArticleSpider.utils.common import get_md5
-from ArticleSpider.items import ArticleItemLoader
+from ArticleSpider.items import JobBoleItemLoader
 
 
 class JobboleSpider(scrapy.Spider):
@@ -29,14 +29,13 @@ class JobboleSpider(scrapy.Spider):
         if next_url:
             yield Request(url=parse.urljoin(response.url, next_url), callback=self.parse)
 
-    @staticmethod
-    def parse_article_page(response):
+    def parse_article_page(self, response):
         """
         通过ItemLoader获取文章页面信息
         :param response:
         :return:
         """
-        item_loader = ArticleItemLoader(item=JobBoleArticleItem(), response=response)
+        item_loader = JobBoleItemLoader(item=JobBoleArticleItem(), response=response)
         item_loader.add_css('title', '.entry-header h1::text')
         item_loader.add_css('create_date', '.entry-meta-hide-on-mobile::text')
         item_loader.add_css('tags', '.entry-meta-hide-on-mobile a::text')
