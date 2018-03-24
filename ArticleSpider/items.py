@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from scrapy.loader import ItemLoader
-from scrapy.loader.processors import MapCompose, Join, TakeFirst
 import datetime
 import re
+from scrapy.loader import ItemLoader
+from scrapy.loader.processors import MapCompose, Join, TakeFirst
+from ArticleSpider.settings import SQL_DATETIME_FORMAT
 
 
 class JobBoleItemLoader(ItemLoader):
@@ -48,30 +49,44 @@ class JobBoleArticleItem(scrapy.Item):
     """
     伯乐在线blog.JobBole Item类
     """
-    title = scrapy.Field()          # 标题
+    title = scrapy.Field()  # 标题
     create_date = scrapy.Field(
         input_processor=MapCompose(date_convert)
-    )                               # 创建日期
+    )  # 创建日期
     tags = scrapy.Field(
         input_processor=MapCompose(removes_comment_tags),
         output_processor=Join(",")
-    )                               # 标签
-    page_url = scrapy.Field()       # 页面url
-    page_url_id = scrapy.Field()    # 页面urlID
+    )  # 标签
+    page_url = scrapy.Field()  # 页面url
+    page_url_id = scrapy.Field()  # 页面urlID
     cover_url = scrapy.Field(
         output_processor=MapCompose(return_value)
-    )                               # 封面url
-    cover_path = scrapy.Field()     # 封面保存路径
-    content = scrapy.Field()        # 文章内容
+    )  # 封面url
+    cover_path = scrapy.Field()  # 封面保存路径
+    content = scrapy.Field()  # 文章内容
     thumb_up_num = scrapy.Field(
         input_processor=MapCompose(get_num)
-    )                               # 点赞数
+    )  # 点赞数
     comment_num = scrapy.Field(
         input_processor=MapCompose(get_num)
-    )                               # 评论数
+    )  # 评论数
     fav_num = scrapy.Field(
         input_processor=MapCompose(get_num)
-    )                               # 收藏数
+    )  # 收藏数
+
+    def get_insert_sql(self):
+        inert_sql = '''
+                    INSERT INTO article_jobbole(
+                        page_url_id, page_url, title, create_date, cover_url, tags, content,
+                        cover_path, thumb_up_num, comment_num, fav_num)
+                    VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                '''
+        params = (self.page_url_id, self.page_url
+                  , self.title, self.create_date
+                  , self.cover_url[0], self.tags
+                  , self.content, self.get("cover_path", "")
+                  , self.get("thumb_up_num", 0), self.comment_num, self.fav_num)
+        return inert_sql, params
 
 
 class ZhiHuQuestionItem(scrapy.Item):
@@ -91,3 +106,45 @@ class ZhiHuQuestionItem(scrapy.Item):
     )
     watch_num = scrapy.Field()
     click_num = scrapy.Field()
+
+    def get_insert_sql(self):
+        insert_sql = """INSERT INTO zhihu_question(question_id, title, content, watch_num
+                        , click_num, comment_num, topics, answers_num, crawl_time)
+                        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)ON DUPLICATE KEY UPDATE title=VALUES(title)
+                        , content=VALUES(content), click_num=VALUES(click_num)
+                        , comment_num=VALUES(comment_num), answers_num=VALUES(answers_num)
+                        , click_num=VALUES(click_num), click_num=VALUES(click_num)
+                        , watch_num=VALUES(watch_num), crawl_update_time=VALUES(crawl_time)"""
+
+        params = (self['question_id'], self['title'], self['content'], self['watch_num']
+                  , self['click_num'], self['comment_num'], self['topics'], self['answers_num']
+                  , datetime.datetime.now().strftime(SQL_DATETIME_FORMAT))
+
+        return insert_sql, params
+
+
+class ZhiHuAnswerItem(scrapy.Item):
+    answer_id = scrapy.Field()
+    question_id = scrapy.Field()
+    author_id = scrapy.Field()
+    author_name = scrapy.Field()
+    vote_up_count = scrapy.Field()
+    comment_count = scrapy.Field()
+    content = scrapy.Field()
+    create_time = scrapy.Field()
+    update_time = scrapy.Field()
+
+    def get_insert_sql(self):
+        insert_sql = """INSERT INTO zhihu_answer(answer_id, question_id, author_id
+                        , author_name, vote_up_count, comment_count
+                        , content, create_time, update_time, crawl_time)
+                        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE content=VALUES(content), comment_count=VALUES(comment_count)
+                        , vote_up_count=VALUES(vote_up_count), crawl_update_time=VALUES(crawl_time)"""
+
+        params = (self["answer_id"], self["question_id"], self["author_id"]
+                  , self["author_name"], self["vote_up_count"], self["comment_count"], self["content"]
+                  , datetime.datetime.fromtimestamp(self["create_time"]).strftime(SQL_DATETIME_FORMAT)
+                  , datetime.datetime.fromtimestamp(self["update_time"]).strftime(SQL_DATETIME_FORMAT)
+                  , datetime.datetime.now().strftime(SQL_DATETIME_FORMAT))
+        return insert_sql, params

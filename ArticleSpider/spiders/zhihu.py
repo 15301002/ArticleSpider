@@ -4,9 +4,10 @@ import os
 import re
 import time
 import pickle
+import json
 from selenium import webdriver
 from urllib import parse
-from ArticleSpider.items import ZhiHuQuestionItemLoader, ZhiHuQuestionItem
+from ArticleSpider.items import ZhiHuQuestionItemLoader, ZhiHuQuestionItem, ZhiHuAnswerItem
 
 
 class ZhiHuSpider(scrapy.Spider):
@@ -32,7 +33,7 @@ class ZhiHuSpider(scrapy.Spider):
                      "%2Ccreated_time%2Cupdated_time%2Creview_info%2Crelevant_info%2Cquestion%2Cexcerpt" \
                      "%2Crelationship.is_authorized%2Cis_author%2Cvoting%2Cis_thanked%2Cis_nothelp" \
                      "%2Cupvoted_followees%3Bdata%5B%2A%5D.mark_infos%5B%2A%5D.url%3Bdata%5B%2A%5D.author" \
-                     ".follower_count%2Cbadge%5B%3F%28type%3Dbest_answerer%29%5D.topics&limit={1}&offset={2}&sort_by" \
+                     ".follower_count%2Cbadge%5B%3F%28type%3Dbest_answerer%29%5D.topics&limit=20&offset=0&sort_by" \
                      "=default "
 
     def start_requests(self):
@@ -83,14 +84,33 @@ class ZhiHuSpider(scrapy.Spider):
         match_obj = re.match('.*?(\d+)$|/', response.url)
         item_loader.add_value('question_id', match_obj.group(1))
 
-        article_item = item_loader.load_item()
-
         selector = response.css('strong.NumberBoard-itemValue::attr("title")').extract()
-        article_item["watch_num"] = selector[0]
-        article_item["click_num"] = selector[1]
+        item_loader.add_value('watch_num', selector[0])
+        item_loader.add_value('click_num', selector[1])
 
-        yield article_item
-        pass
+        zhihu_question_item = item_loader.load_item()
+
+        yield zhihu_question_item
+        yield scrapy.Request(self.answer_api_url.format(match_obj.group(1)), headers=self.headers, callback=self.parse_answers)
 
     def parse_answers(self, response):
-        pass
+        answer_json = json.loads(response.text)
+        is_end = answer_json["paging"].get("is_end", True)
+        next_url = answer_json["paging"].get("next", None)
+
+        for answer in answer_json.get("data", None):
+            answer_item = ZhiHuAnswerItem()
+            answer_item["answer_id"] = answer.get("id", None)
+            answer_item["question_id"] = answer["question"].get("id", None)
+            answer_item["author_id"] = answer["author"].get("id", None)
+            answer_item["author_name"] = answer["author"].get("name", None)
+            answer_item["vote_up_count"] = answer.get("voteup_count", 0)
+            answer_item["comment_count"] = answer.get("comment_count", 0)
+            answer_item["content"] = answer.get("content", answer.get("excerpt", None))
+            answer_item["create_time"] = answer.get("created_time", None)
+            answer_item["update_time"] = answer.get("updated_time", None)
+            yield answer_item
+            pass
+
+        if is_end is not True:
+            yield scrapy.Request(next_url, headers=self.headers, callback=self.parse_answers)
