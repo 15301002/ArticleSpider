@@ -8,6 +8,7 @@ import json
 from selenium import webdriver
 from urllib import parse
 from ArticleSpider.items import ZhiHuQuestionItemLoader, ZhiHuQuestionItem, ZhiHuAnswerItem
+from ArticleSpider.settings import project_dir
 
 
 class ZhiHuSpider(scrapy.Spider):
@@ -15,17 +16,17 @@ class ZhiHuSpider(scrapy.Spider):
     allowed_domains = ['zhihu.com']
     start_urls = ["http://zhihu.com"]
 
+    # 请求头
     headers = {
         "HOST": "www.zhihu.com",
         "Referer": "https://www.zhizhu.com",
         'User-Agent': "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:51.0) Gecko/20100101 Firefox/51.0"
     }
-
-    USER_NAME = 13439876152
-    PASSWORD = 'chengchen0716'
-    PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    COOKIES_PATH = os.path.join(PROJECT_DIR, 'temp', 'cookies.zhihu')
-
+    USER_NAME = 13439876152     # 用户名
+    PASSWORD = 'chengchen0716'  # 密码
+    # cookies本地存放路径
+    COOKIES_PATH = os.path.join(project_dir, 'temp', 'cookies.zhihu')
+    # ZhiHu Answer Api接口
     answer_api_url = "https://www.zhihu.com/api/v4/questions/{0}/answers?include=data%5B%2A%5D.is_normal" \
                      "%2Cadmin_closed_comment%2Creward_info%2Cis_collapsed%2Cannotation_action%2Cannotation_detail" \
                      "%2Ccollapse_reason%2Cis_sticky%2Ccollapsed_by%2Csuggest_edit%2Ccomment_count%2Ccan_comment" \
@@ -38,27 +39,29 @@ class ZhiHuSpider(scrapy.Spider):
 
     def start_requests(self):
         if os.path.exists(self.COOKIES_PATH):
+            # 如果本地cookies文件存在，读取cookies信息
             f = open(self.COOKIES_PATH, 'rb')
             cookies = pickle.load(f)
             f.close()
         else:
-            browser = webdriver.Chrome(executable_path=os.path.join(
-                self.PROJECT_DIR, 'chromedriver.exe'))
-
+            # 否则调用selenium访问知乎登陆页面
+            # 模拟登陆，获取cookies信息存入文件
+            browser = webdriver.Chrome(executable_path=os.path.join(project_dir, 'chromedriver.exe'))
             browser.get('https://www.zhihu.com/signin')
-            browser.find_element_by_css_selector(".SignFlow-accountInput.Input-wrapper input").send_keys(
-                self.USER_NAME)
-            browser.find_element_by_css_selector(".SignFlow-password input").send_keys(
-                self.PASSWORD)
-            browser.find_element_by_css_selector(
-                ".Button.SignFlow-submitButton").click()
+            # 填写用户名、密码并登录
+            browser.find_element_by_css_selector(".SignFlow-accountInput.Input-wrapper input").send_keys(self.USER_NAME)
+            browser.find_element_by_css_selector(".SignFlow-password input").send_keys(self.PASSWORD)
+            browser.find_element_by_css_selector(".Button.SignFlow-submitButton").click()
+            # 休眠5秒等待页面加载完成
             time.sleep(5)
+            # 获取登录后cookies
             cookies = browser.get_cookies()
-            f = open(os.path.join(self.PROJECT_DIR, 'temp', 'cookies.zhihu'), 'wb')
+            # 将cookies信息写入文件
+            f = open(os.path.join(project_dir, 'temp', 'cookies.zhihu'), 'wb')
             pickle.dump(cookies, f)
             f.close()
             browser.close()
-        cookie_dict = {}
+        cookie_dict = dict()
         for cookie in cookies:
             cookie_dict[cookie['name']] = cookie['value']
 
@@ -69,7 +72,8 @@ class ZhiHuSpider(scrapy.Spider):
         for url in urls:
             match_obj = re.match('^(/question/\d+).*', url)
             if match_obj:
-                yield scrapy.Request(parse.urljoin(response.url, match_obj.group(1)), headers=self.headers, callback=self.parse_question)
+                yield scrapy.Request(parse.urljoin(response.url, match_obj.group(1)), headers=self.headers,
+                                     callback=self.parse_question)
             else:
                 yield scrapy.Request(parse.urljoin(response.url, url), headers=self.headers, callback=self.parse)
 
@@ -91,7 +95,8 @@ class ZhiHuSpider(scrapy.Spider):
         zhihu_question_item = item_loader.load_item()
 
         yield zhihu_question_item
-        yield scrapy.Request(self.answer_api_url.format(match_obj.group(1)), headers=self.headers, callback=self.parse_answers)
+        yield scrapy.Request(self.answer_api_url.format(match_obj.group(1)), headers=self.headers,
+                             callback=self.parse_answers)
 
     def parse_answers(self, response):
         answer_json = json.loads(response.text)
